@@ -17,24 +17,27 @@ import random
 from kivy.graphics import Ellipse
 from kivy.uix.scatter import Scatter
 
+Builder.load_file("menu.kv")
 
 
 class MainWidget(RelativeLayout):
     char = None
+    bg = None
+    rectangle_image = ObjectProperty(Image(source='images/bg2.zip',anim_delay=0.1))
     char_height = 0.05
     char_width = 0.2
     char_offset = .3
 
     velocity = 0
-    step_velocity = 0.2
-    obs_velcoity = 0.1
+    step_velocity = 0.3
+    obs_velcoity = 0.2
 
     obs_width = 0.05
     obs_height = 0.1
 
     NB_OBS = 1
     obs = []
-    obs_images = ["images/asteroid.png", "images/earth.png", "images/ship.png"]
+    obs_images = ["images/asteroid.png", "images/missle.png", "images/burger.png"]
 
     world = None
     world_width = 1
@@ -45,14 +48,21 @@ class MainWidget(RelativeLayout):
     collision_circle_size = 0.2
 
     score = 0
+    level = 0
 
     first_obstacle_delay = 3.0
     game_start_time = 0.0
     first_obstacle_spawned = False
 
+    menu_title = StringProperty("WORLD DEFENDER")
+    menu_button = StringProperty("START")
     score_txt = StringProperty("SCORE")
     health_txt = StringProperty("HEALTH: 100%")
+    menu_widget = ObjectProperty()
     health_counter = 100
+
+    state_game_over = False
+    state_game_start = False
 
 
     def __init__(self, **kwargs):
@@ -69,6 +79,17 @@ class MainWidget(RelativeLayout):
             self._keyboard.bind(on_key_up=self.on_keyboard_up)
 
         Clock.schedule_interval(self.update, 1.0/60.0)
+
+    
+    def reset_game(self):
+        self.collision_count = 0
+        self.level = 0
+        self.score = 0
+        self.health_counter = 100 
+        self.score_txt = "SCORE: 0" 
+        self.health_txt = "HEALTH: 100%"
+        self.state_game_over = False
+        self.first_obstacle_spawned = False
     
     
     def is_desktop(self):
@@ -91,6 +112,11 @@ class MainWidget(RelativeLayout):
         if self.char.pos[0] <= 0:
             y = self.char.pos[1]
             self.char.pos = (0,y)
+
+        char_image = "images/platform.png"
+        char_texture = Image(source=char_image).texture
+        self.char.texture = char_texture
+
             
 
     def init_obstacles(self):
@@ -109,6 +135,10 @@ class MainWidget(RelativeLayout):
 
         self.world.size = (self.width, self.world_height * self.height)
         self.world.pos = (0, 0)
+
+        world_image = "images/world_color.png"
+        world_texture = Image(source=world_image).texture
+        self.world.texture = world_texture
 
         
 
@@ -135,33 +165,50 @@ class MainWidget(RelativeLayout):
         self.update_world()
         time_factor = dt * 60
         
-        char_x = self.char.pos[0]
-        char_x += self.velocity * time_factor
-        char_y = self.char_offset * self.height
-        self.char.pos = (char_x, char_y)
 
-        for obstacle in self.obs:
-            pos_y = obstacle.pos[1]
-            pos_y -= self.obs_velcoity * time_factor * self.height / 10
-            obstacle.pos = (obstacle.pos[0], pos_y)
-
-            # Check collision with character
-            if self.collides_with_char(obstacle):
-                self.reset_obstacle()
-                self.increment_score()
-
-        # Check if obstacle is off the screen
-        if pos_y + obstacle.size[1] < 0:
-            self.reset_obstacle()
         
-        if self.collides_with_world(obstacle):
-            self.collision_count += 1
-            self.health_counter -= 25
-            self.health_txt = "HEALTH: " + str(self.health_counter) + "%"
+
+        if not self.state_game_over and self.state_game_start:
+            char_x = self.char.pos[0]
+            char_x += self.velocity * time_factor
+            char_y = self.char_offset * self.height
+            self.char.pos = (char_x, char_y)
+            for obstacle in self.obs:
+                if not self.first_obstacle_spawned:
+                    obstacle.pos = (self.width *2, self.height *2)
+                    self.first_obstacle_spawned = True
+                pos_y = obstacle.pos[1]
+                pos_y -= self.obs_velcoity * time_factor * self.height / 10
+                obstacle.pos = (obstacle.pos[0], pos_y)
+
+                # Check collision with character
+                if self.collides_with_char(obstacle):
+                    self.reset_obstacle()
+                    self.increment_score()
+
+            # Check if obstacle is off the screen
+            if pos_y + obstacle.size[1] < 0:
+                self.reset_obstacle()
+            
+            self.health_counter = self.health_counter
+            if self.collides_with_world(obstacle):
+                self.collision_count += 1
+                self.health_counter -= 25
+                self.health_txt = "HEALTH: " + str(self.health_counter) + "%"
+
+                if self.health_counter == 0 and not self.state_game_over:
+                    self.state_game_over = True
+                    self.menu_widget.opacity = 1
+                    self.menu_title = "GAME OVER"
+                    self.menu_button = "RESTART"
+                    self.game_over()
 
 
-            print("Collision: "+ str(self.collision_count))
-            self.reset_obstacle()
+                print("Collision: "+ str(self.collision_count))
+                self.reset_obstacle()
+        
+        
+        #self.increase_level()
 
     def collides_with_char(self, obstacle):
         char_left = self.char.pos[0]
@@ -206,7 +253,16 @@ class MainWidget(RelativeLayout):
 
         obstacle = self.obs[0]
         obstacle.texture = obstacle_texture
-        obstacle.size = (self.obs_width*self.width, self.obs_height*self.height)
+        if obstacle_image == "images/asteroid.png":
+            print("asteroid")
+            obstacle.size = (0.15*self.width, 0.15*self.width)
+        
+        elif obstacle_image == "images/missle.png":
+            obstacle.size = (0.15*self.width, 0.2*self.width)
+
+
+        elif obstacle_image == "images/burger.png":
+            obstacle.size = (0.13*self.width, 0.1*self.width)
         obstacle.pos = (random.randint(0, int(self.width) - int(obstacle.size[0])), int(self.height))
     
 
@@ -239,6 +295,14 @@ class MainWidget(RelativeLayout):
         self.collision_circles.remove(circle)
 
 
+    def increase_level(self):
+        self.level = self.score // 5 + 1
+
+        self.obs_velcoity = 0.1 + self.level * 0.01
+
+        if self.obs_velcoity >= 0.17:
+            self.obs_velcoity = 0.17
+
 
 
     def increment_score(self):
@@ -265,6 +329,14 @@ class MainWidget(RelativeLayout):
 
     def game_over(self):
         print("Game Over")  # Placeholder for game over logic
+    
+    def on_menu_button_press(self): 
+        print("Button")
+        self.reset_game()
+        self.state_game_start = True
+        self.menu_widget.opacity = 0
+    
+        
 
 
 
