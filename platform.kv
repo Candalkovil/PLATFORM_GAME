@@ -4,28 +4,20 @@ MainWidget:
 #:set s dp(150)
 
 <MainWidget>:
-    canvas.before:
-        Rectangle:
-            size: self.width * 1.2, self.height
-            pos: 0 - self.width*0.1,0
-            source: 'images/bg1.jpg'
-            texture: root.rectangle_image.texture
-    menu_widget: menu_widget
     MenuWidget:
-        id: menu_widget
     Label: 
         text: root.score_txt
         font_size: dp(20)
         font_name: 'fonts/Eurostile.ttf'
         size_hint: .2, .2
-        pos: self.width * 0.1, 4*self.height 
-
+        pos_hint: {"x":0, "top":1}
+    
     Label: 
         text: root.health_txt
         font_size: dp(20)
         font_name: 'fonts/Eurostile.ttf'
         size_hint: .2, .2
-        pos: self.width * 3.6, 4*self.height 
+        pos_hint: {"x":0.7, "top":1}
     
     
 
