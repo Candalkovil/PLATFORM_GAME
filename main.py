@@ -37,6 +37,9 @@ class MainWidget(RelativeLayout):
     collision_ellipse_img = "images/aura.png"
     char_img = "images/platform.png"
     world_img = "images/world_color.png"
+    music_file = "audio/main_music.wav"
+
+    enable_music = False
 
     # External kv properties
     menu_title = StringProperty("WORLD DEFENDER")
@@ -114,10 +117,14 @@ class MainWidget(RelativeLayout):
 
     def init_audio(self):
         # Audio init and volume control
-        self.sound_music = SoundLoader.load("audio/main_music.wav")
+        if self.enable_music:
+            self.sound_music = SoundLoader.load(self.music_file)
+        
 
-        self.sound_music.volume = 1
-        self.music_position = 0
+            self.sound_music.volume = 1
+            self.music_position = 0
+
+       
 
     def reset_game(self):
         # Variables reset after game
@@ -237,7 +244,8 @@ class MainWidget(RelativeLayout):
                     self.menu_title = "GAME OVER"
                     self.menu_button = "RESTART"
                     self.highscore_txt = "HIGHSCORE: " + str(self.high_score)
-                    self.sound_music.stop()
+                    if self.enable_music:
+                        self.sound_music.stop()
                     self.game_over()
 
                 self.reset_obstacle()
@@ -311,7 +319,8 @@ class MainWidget(RelativeLayout):
     def on_menu_button_press(self):
         # Menu Controls
         self.reset_game()
-        self.sound_music.play()
+        if self.enable_music:
+            self.sound_music.play()
         self.state_game_start = True
         self.menu_widget.opacity = 0
     
