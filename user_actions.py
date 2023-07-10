@@ -22,6 +22,10 @@ def on_keyboard_down(self, keyboard, keycode, text, modifiers):
         self.move_right()
     elif keycode[1] == "escape":
         self.on_pause_button_press()
+    elif keycode[1] == "m":
+        self.on_music_button_press()
+    elif keycode[1] == 'v':
+        self.on_vfx_button_press()
     return True
 
 
