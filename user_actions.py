@@ -20,6 +20,8 @@ def on_keyboard_down(self, keyboard, keycode, text, modifiers):
         self.move_left()
     elif keycode[1] == 'right' or keycode[1] == 'd':
         self.move_right()
+    elif keycode[1] == "escape":
+        self.on_pause_button_press()
     return True
 
 
@@ -29,10 +31,11 @@ def on_keyboard_up(self, keyboard, keycode):
 
 def on_touch_down(self, touch):
     if not self.state_game_over and self.state_game_start:
-        if touch.x < self.width/2:
-            self.move_left()
-        else:
-            self.move_right()
+        if touch.y < self.height * 0.5:
+            if touch.x < self.width/2:
+                self.move_left()
+            else:
+                self.move_right()
     
     return super(RelativeLayout, self).on_touch_down(touch)
 

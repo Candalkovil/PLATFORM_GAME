@@ -3,8 +3,8 @@ from kivy.config import Config
 from kivy.lang import Builder
 from kivy.core.audio import SoundLoader
 Config.set('graphics', 'resizable', '0')
-Config.set('graphics', 'width', '600')
-Config.set('graphics', 'height', '750')
+Config.set('graphics', 'width', '640')
+Config.set('graphics', 'height', '960')
 kivy.require('2.2.1')
 from kivy.app import App
 from kivy.graphics.vertex_instructions import Rectangle
@@ -19,27 +19,26 @@ from kivy.uix.scatter import Scatter
 
 
 Builder.load_file("menu.kv")
-#Builder.load_file("pause.kv")
+Builder.load_file("pause_menu.kv")
 
 class MainWidget(RelativeLayout):
-    from Collision import spawn_collision_circle, remove_collision_circle, spawn_collision_ellipse, remove_collision_ellipse
     from user_actions import move_left, move_right, keyboard_closed, on_keyboard_down, on_keyboard_up, on_touch_down, on_touch_up
     from game_extras import increase_level, increment_score, game_over
     # User Creation
     char = None
 
-    rectangle_image = ObjectProperty(Image(source='images/bg_evening.zip', anim_delay=0.1))
+    rectangle_image = ObjectProperty(Image(source='images/bg_pixel.png', anim_delay=0.1))
 
     # Set Images
-    obs_images = ["images/asteroid.png", "images/missle.png", "images/burger_main.png", "images/superman.png"]
+    obs_images = ["images/meteor_main.png", "images/missile_main.png", "images/dragon.png", "images/burger.png"]
     impact_images = ["images/impact1.png", "images/impact2.png"]
     collision_circle_img = "images/ex.png"
     collision_ellipse_img = "images/aura.png"
-    char_img = "images/platform.png"
+    char_img = "images/platform_main.png"
     world_img = "images/world_color.png"
     music_file = "audio/main_music.wav"
 
-    enable_music = False
+    enable_music = True
 
     # External kv properties
     menu_title = StringProperty("WORLD DEFENDER")
@@ -47,17 +46,20 @@ class MainWidget(RelativeLayout):
     score_txt = StringProperty("SCORE")
     health_txt = StringProperty("HEALTH: 100%")
     highscore_txt = StringProperty("HIGHSCORE")
+    pause_txt = StringProperty("")
     menu_widget = ObjectProperty()
+    pause_widget = ObjectProperty()
+    
 
     # User properties
-    char_height = 0.05
-    char_width = 0.2
-    char_offset = .2
+    char_height = 0.07
+    char_width = 0.27
+    char_offset = .3
 
     # user and obstacle velocity
     velocity = 0
     step_velocity = 0.3
-    obs_velcoity = 0.2
+    obs_velocity = 0.2
 
     # Obstacle Properties
     obs_width = 0.05
@@ -91,6 +93,8 @@ class MainWidget(RelativeLayout):
     first_obstacle_spawned = False
     state_game_over = False
     state_game_start = False
+    state_game_pause = False
+    show_pause_button = False
 
     sound_impact = None
     sound_music = None
@@ -103,8 +107,11 @@ class MainWidget(RelativeLayout):
         self.init_char()
         self.init_obstacles()
         self.init_world()
+
         self.game_start_time = Clock.get_time()
         print(kivy.__version__ )
+        
+
         
 
         if self.is_desktop():
@@ -134,7 +141,7 @@ class MainWidget(RelativeLayout):
         self.health_counter = 100
         self.score_txt = "SCORE: 0"
         self.health_txt = "HEALTH: 100%"
-        self.obs_velcoity = 0.2
+        self.obs_velocity = 0.2
         self.step_velocity = 0.3
         self.state_game_over = False
         self.first_obstacle_spawned = False
@@ -201,54 +208,62 @@ class MainWidget(RelativeLayout):
         Includes movement feature for user.
         '''
         self.update_char()
-        self.update_world()
         time_factor = dt * 60
+        
+        if self.show_pause_button:
+            self.pause_widget.opacity = 1
+        else:
+            self.pause_widget.opacity = 0
+        
+        if not self.state_game_pause:
+            self.update_world()
+            if not self.state_game_over and self.state_game_start:
+                if self.sound_music.state == "stop":
+                    self.sound_music.play()
+                char_x = self.char.pos[0]
+                char_x += self.velocity * time_factor
+                char_y = self.char_offset * self.height
+                self.char.pos = (char_x, char_y)
+                for obstacle in self.obs:
+                    if not self.first_obstacle_spawned:
+                        obstacle.pos = (self.width * 2, self.height * 2)
+                        self.first_obstacle_spawned = True
+                    pos_y = obstacle.pos[1]
+                    pos_y -= self.obs_velocity * time_factor * self.height / 10
+                    obstacle.pos = (obstacle.pos[0], pos_y)
 
+                    # Check collision with character
+                    if self.collides_with_char(obstacle):
+                        self.reset_obstacle()
+                        self.increment_score()
+                        if self.score > 20:
+                            self.increase_level()
+                        self.spawn_collision_ellipse(self.char.pos, self.collision_ellipse_img)
 
-        if not self.state_game_over and self.state_game_start:
-            char_x = self.char.pos[0]
-            char_x += self.velocity * time_factor
-            char_y = self.char_offset * self.height
-            self.char.pos = (char_x, char_y)
-            for obstacle in self.obs:
-                if not self.first_obstacle_spawned:
-                    obstacle.pos = (self.width * 2, self.height * 2)
-                    self.first_obstacle_spawned = True
-                pos_y = obstacle.pos[1]
-                pos_y -= self.obs_velcoity * time_factor * self.height / 10
-                obstacle.pos = (obstacle.pos[0], pos_y)
-
-                # Check collision with character
-                if self.collides_with_char(obstacle):
+                # Check if obstacle is off the screen
+                if pos_y + obstacle.size[1] < 0:
                     self.reset_obstacle()
-                    self.increment_score()
-                    if self.score > 20:
-                        self.increase_level()
-                    self.spawn_collision_ellipse(self.char.pos, self.collision_ellipse_img)
 
-            # Check if obstacle is off the screen
-            if pos_y + obstacle.size[1] < 0:
-                self.reset_obstacle()
+                self.health_counter = self.health_counter
+                if self.collides_with_world(obstacle):
+                    self.collision_count += 1
+                    self.health_counter -= 50
+                    self.health_txt = "HEALTH: " + str(self.health_counter) + "%"
 
-            self.health_counter = self.health_counter
-            if self.collides_with_world(obstacle):
-                self.collision_count += 1
-                self.health_counter -= 50
-                self.health_txt = "HEALTH: " + str(self.health_counter) + "%"
+                    if self.health_counter == 0 and not self.state_game_over:
+                        self.state_game_over = True
+                        if self.score > self.high_score:
+                            self.high_score = self.score
+                        self.menu_widget.opacity = 1
+                        self.show_pause_button = False
+                        self.menu_title = "GAME OVER"
+                        self.menu_button = "RESTART"
+                        self.highscore_txt = "HIGHSCORE: " + str(self.high_score)
+                        if self.enable_music:
+                            self.sound_music.stop()
+                        self.game_over()
 
-                if self.health_counter == 0 and not self.state_game_over:
-                    self.state_game_over = True
-                    if self.score > self.high_score:
-                        self.high_score = self.score
-                    self.menu_widget.opacity = 1
-                    self.menu_title = "GAME OVER"
-                    self.menu_button = "RESTART"
-                    self.highscore_txt = "HIGHSCORE: " + str(self.high_score)
-                    if self.enable_music:
-                        self.sound_music.stop()
-                    self.game_over()
-
-                self.reset_obstacle()
+                    self.reset_obstacle()
 
     def collides_with_char(self, obstacle):
         '''
@@ -303,14 +318,14 @@ class MainWidget(RelativeLayout):
 
         obstacle = self.obs[0]
         obstacle.texture = obstacle_texture
-        if obstacle_image == "images/asteroid.png":
-            obstacle.size = (0.15 * self.width, 0.15 * self.width)
-        elif obstacle_image == "images/missle.png":
-            obstacle.size = (0.15 * self.width, 0.2 * self.width)
-        elif obstacle_image == "images/burger_main.png":
-            obstacle.size = (0.13 * self.width, 0.1 * self.width)
-        elif obstacle_image == "images/superman.png":
-            obstacle.size = (0.2 * self.width, 0.17 * self.width)
+        if obstacle_image == "images/meteor_main.png":
+            obstacle.size = (0.3 * self.width, 0.24 * self.width)
+        elif obstacle_image == "images/missile_main.png":
+            obstacle.size = (0.2 * self.width, 0.15 * self.width)
+        elif obstacle_image == "images/dragon.png":
+            obstacle.size = (0.13 * self.width, 0.13 * self.width)
+        elif obstacle_image == "images/burger.png":
+            obstacle.size = (0.12 * self.width, 0.1 * self.width)
         obstacle.pos = (
             random.randint(0, int(self.width) - int(obstacle.size[0])),
             int(self.height),
@@ -323,14 +338,95 @@ class MainWidget(RelativeLayout):
             self.sound_music.play()
         self.state_game_start = True
         self.menu_widget.opacity = 0
+        self.show_pause_button = True
     
+    def on_pause_button_press(self):
+        if not self.state_game_pause:
+            self.state_game_pause = True
+            self.pause_txt = "PAUSED"
+        else:
+            self.state_game_pause = False
+            self.pause_txt = ""
+
+
+    def spawn_collision_circle(self, position, image_file=None):
+        if image_file is None:
+            circle_image = Image(source='images/ex.png')
+        else:
+            circle_image = Image(source=image_file)
+        circle_image.size_hint = (None, None)
+        circle_image.size = (self.collision_circle_size * self.height, self.collision_circle_size * self.height)
+
+        scatter = Scatter(
+            size_hint=(None, None),
+            size=circle_image.size,
+            do_translation=False
+        )
+
+        scatter.add_widget(circle_image)
+        self.collision_circles.append(scatter)
+        self.add_widget(scatter)
+
+        offset_x = circle_image.width / 2
+        offset_y = self.height * 0.05
+
+        scatter.pos = (position[0] - offset_x, position[1] - offset_y)
+
+        if self.health_counter < 51:
+            time_skip = 0.05
+        else:
+            time_skip = 1.0
+
+        Clock.schedule_once(lambda dt: self.remove_collision_circle(scatter), time_skip)
+
+
+    def remove_collision_circle(self, circle):
+        self.remove_widget(circle)
+        self.collision_circles.remove(circle)
+
+
+    def spawn_collision_ellipse(self, position, image_file=None):
+        if image_file is None:
+            image_temp = "images/aura.png"
+        else:
+            image_temp = image_file
+        opacity = 0.6
+        ellipse_image = Image(source=image_temp, opacity=0.6)
+        ellipse_image.size_hint = (None, None)
+        ellipse_image.size = (self.collision_ellipse_size * self.height, self.collision_ellipse_size * self.height)
+
+        scatter = Scatter(
+            size_hint=(None, None),
+            size=ellipse_image.size,
+            do_translation=False
+        )
+
+        scatter.add_widget(ellipse_image)
+        self.collision_ellipses.append(scatter)
+        self.add_widget(scatter)
+
+        offset_x = self.width * 0.01
+        offset_y = self.height * 0.04
+
+        scatter.pos = (position[0] - offset_x, position[1] - offset_y)
+
+        Clock.schedule_once(lambda dt: self.remove_collision_ellipse(scatter), 0.5)
+
+
+    def remove_collision_ellipse(self, ellipse):
+        self.remove_widget(ellipse)
+        self.collision_ellipses.remove(ellipse)
+
+        
 
 
 
 class PlatformApp(App):
     from kivy.logger import Logger
 
+
     title = "WORLD DEFENDER"
+
     def build(self):
         return super().build()
 
