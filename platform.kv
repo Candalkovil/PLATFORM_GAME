@@ -1,5 +1,6 @@
 #:import menu menu
 #:import pause_menu pause_menu
+#:import extras extras
 MainWidget:
 #:set s dp(150)
 
@@ -12,10 +13,13 @@ MainWidget:
             texture: root.rectangle_image.texture
     menu_widget: menu_widget
     pause_widget: pause_widget
+    extras_widget: extras_widget
     PauseWidget:
         id: pause_widget
     MenuWidget:
         id: menu_widget
+    ExtrasWidget:
+        id: extras_widget
     Label: 
         text: root.score_txt
         font_size: dp(25)
