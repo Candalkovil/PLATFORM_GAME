@@ -1,23 +1,44 @@
 #:import menu menu
-
+#:import pause_menu pause_menu
 MainWidget:
 #:set s dp(150)
 
 <MainWidget>:
+    canvas.before:
+        Rectangle:
+            size: self.width, self.height
+            pos: 0,0
+            source: 'images/bg1.jpg'
+            texture: root.rectangle_image.texture
+    menu_widget: menu_widget
+    pause_widget: pause_widget
+    PauseWidget:
+        id: pause_widget
     MenuWidget:
+        id: menu_widget
     Label: 
         text: root.score_txt
-        font_size: dp(20)
+        font_size: dp(25)
         font_name: 'fonts/Eurostile.ttf'
         size_hint: .2, .2
-        pos_hint: {"x":0, "top":1}
-    
+        pos: 0.05 * root.width, 0.8 *root.height
+
     Label: 
         text: root.health_txt
-        font_size: dp(20)
+        font_size: dp(25)
         font_name: 'fonts/Eurostile.ttf'
         size_hint: .2, .2
-        pos_hint: {"x":0.7, "top":1}
+        pos: root.width * 0.7, 0.8 *root.height
+    
+    Label:
+        text: root.pause_txt
+        font_size: dp(40)
+        font_name: 'fonts/Eurostile.ttf'
+        size_hint: .2, .2
+        pos: root.width * 0.5 - self.width/2, 0.5 * root.height 
+
+
+
     
     
 
