@@ -20,6 +20,7 @@ from kivy.uix.scatter import Scatter
 
 Builder.load_file("menu.kv")
 Builder.load_file("pause_menu.kv")
+Builder.load_file("extras.kv")
 
 class MainWidget(RelativeLayout):
     from user_actions import move_left, move_right, keyboard_closed, on_keyboard_down, on_keyboard_up, on_touch_down, on_touch_up
@@ -33,10 +34,12 @@ class MainWidget(RelativeLayout):
     obs_images = ["images/meteor_main.png", "images/missile_main.png", "images/dragon.png", "images/burger.png"]
     impact_images = ["images/impact1.png", "images/impact2.png"]
     collision_circle_img = "images/ex.png"
-    collision_ellipse_img = "images/aura.png"
+    collision_ellipse_img = "images/blue.png"
     char_img = "images/platform_main.png"
     world_img = "images/world_color.png"
     music_file = "audio/main_music.wav"
+    comic_img = "images/pow.png"
+
 
     enable_music = True
 
@@ -46,9 +49,13 @@ class MainWidget(RelativeLayout):
     score_txt = StringProperty("SCORE")
     health_txt = StringProperty("HEALTH: 100%")
     highscore_txt = StringProperty("HIGHSCORE")
+    music_img = StringProperty("images/music.png")
+    music_txt = StringProperty("MUSIC: ON")
+    vfx_text = StringProperty("VFX: ON")
     pause_txt = StringProperty("")
     menu_widget = ObjectProperty()
     pause_widget = ObjectProperty()
+    extras_widget = ObjectProperty()
     
 
     # User properties
@@ -67,7 +74,11 @@ class MainWidget(RelativeLayout):
 
     # User to Obstacle Collision Ellipse
     collision_ellipses = []
-    collision_ellipse_size = 0.2
+    collision_ellipse_width = 0.3
+    collision_ellipse_height = 0.2
+
+    collision_comic = []
+    collision_comic_size = 0.1
 
     # Obs generation
     NB_OBS = 1
@@ -80,6 +91,8 @@ class MainWidget(RelativeLayout):
     collision_count = 0
     collision_circles = []
     collision_circle_size = 0.2
+
+    vfx_option = True
 
     # Score metrics
     high_score = 0
@@ -95,10 +108,12 @@ class MainWidget(RelativeLayout):
     state_game_start = False
     state_game_pause = False
     show_pause_button = False
+    show_extras_button = False
 
     sound_impact = None
     sound_music = None
     music_position = 0
+    mute_music = False
 
     def __init__(self, **kwargs):
         super(MainWidget, self).__init__(**kwargs)
@@ -212,13 +227,16 @@ class MainWidget(RelativeLayout):
         
         if self.show_pause_button:
             self.pause_widget.opacity = 1
+            
         else:
             self.pause_widget.opacity = 0
+            
         
         if not self.state_game_pause:
+            self.extras_widget.opacity = 0
             self.update_world()
             if not self.state_game_over and self.state_game_start:
-                if self.sound_music.state == "stop":
+                if self.sound_music.state == "stop" and not self.mute_music:
                     self.sound_music.play()
                 char_x = self.char.pos[0]
                 char_x += self.velocity * time_factor
@@ -239,6 +257,7 @@ class MainWidget(RelativeLayout):
                         if self.score > 20:
                             self.increase_level()
                         self.spawn_collision_ellipse(self.char.pos, self.collision_ellipse_img)
+                        self.spawn_collision_comic(self.char.pos, self.comic_img)
 
                 # Check if obstacle is off the screen
                 if pos_y + obstacle.size[1] < 0:
@@ -334,7 +353,7 @@ class MainWidget(RelativeLayout):
     def on_menu_button_press(self):
         # Menu Controls
         self.reset_game()
-        if self.enable_music:
+        if self.enable_music and not self.mute_music:
             self.sound_music.play()
         self.state_game_start = True
         self.menu_widget.opacity = 0
@@ -344,40 +363,66 @@ class MainWidget(RelativeLayout):
         if not self.state_game_pause:
             self.state_game_pause = True
             self.pause_txt = "PAUSED"
+            self.extras_widget.opacity = 1
         else:
             self.state_game_pause = False
             self.pause_txt = ""
+            self.extras_widget.opacity = 0
+    
+    def on_music_button_press(self):
+        if not self.mute_music:
+            self.mute_music = True
+            self.sound_music.stop()
+            self.music_img = "images/mute_music.png"
+            self.music_txt = "MUSIC: OFF"
+        else:
+            self.mute_music = False
+            self.sound_music.play()
+            self.music_img = "images/music.png"
+            self.music_txt = "MUSIC: ON"
+
+    def on_vfx_button_press(self):
+        if self.vfx_option:
+            self.vfx_option = False
+            self.vfx_text = "VFX: OFF"
+        else:
+            self.vfx_option = True
+            self.vfx_text = "VFX: ON"
 
 
     def spawn_collision_circle(self, position, image_file=None):
-        if image_file is None:
-            circle_image = Image(source='images/ex.png')
+
+        if self.vfx_option:
+            if image_file is None:
+                circle_image = Image(source='images/ex.png')
+            else:
+                circle_image = Image(source=image_file)
+            circle_image.size_hint = (None, None)
+            circle_image.size = (self.collision_circle_size * self.height, self.collision_circle_size * self.height)
+
+            scatter = Scatter(
+                size_hint=(None, None),
+                size=circle_image.size,
+                do_translation=False
+            )
+
+            scatter.add_widget(circle_image)
+            self.collision_circles.append(scatter)
+            self.add_widget(scatter)
+
+            offset_x = circle_image.width / 2
+            offset_y = self.height * 0.05
+
+            scatter.pos = (position[0] - offset_x, position[1] - offset_y)
+
+            if self.health_counter < 51:
+                time_skip = 0.05
+            else:
+                time_skip = 1.0
+
+            Clock.schedule_once(lambda dt: self.remove_collision_circle(scatter), time_skip)
         else:
-            circle_image = Image(source=image_file)
-        circle_image.size_hint = (None, None)
-        circle_image.size = (self.collision_circle_size * self.height, self.collision_circle_size * self.height)
-
-        scatter = Scatter(
-            size_hint=(None, None),
-            size=circle_image.size,
-            do_translation=False
-        )
-
-        scatter.add_widget(circle_image)
-        self.collision_circles.append(scatter)
-        self.add_widget(scatter)
-
-        offset_x = circle_image.width / 2
-        offset_y = self.height * 0.05
-
-        scatter.pos = (position[0] - offset_x, position[1] - offset_y)
-
-        if self.health_counter < 51:
-            time_skip = 0.05
-        else:
-            time_skip = 1.0
-
-        Clock.schedule_once(lambda dt: self.remove_collision_circle(scatter), time_skip)
+            pass
 
 
     def remove_collision_circle(self, circle):
@@ -386,31 +431,34 @@ class MainWidget(RelativeLayout):
 
 
     def spawn_collision_ellipse(self, position, image_file=None):
-        if image_file is None:
-            image_temp = "images/aura.png"
-        else:
-            image_temp = image_file
-        opacity = 0.6
-        ellipse_image = Image(source=image_temp, opacity=0.6)
-        ellipse_image.size_hint = (None, None)
-        ellipse_image.size = (self.collision_ellipse_size * self.height, self.collision_ellipse_size * self.height)
+            if self.vfx_option:
+                if image_file is None:
+                    image_temp = "images/light.png"
+                else:
+                    image_temp = image_file
+                opacity = 0.6
+                ellipse_image = Image(source=image_temp, opacity=0.6)
+                ellipse_image.size_hint = (None, None)
+                ellipse_image.size = (self.collision_ellipse_width * self.height, self.collision_ellipse_height * self.height)
 
-        scatter = Scatter(
-            size_hint=(None, None),
-            size=ellipse_image.size,
-            do_translation=False
-        )
+                scatter = Scatter(
+                    size_hint=(None, None),
+                    size=ellipse_image.size,
+                    do_translation=False
+                )
 
-        scatter.add_widget(ellipse_image)
-        self.collision_ellipses.append(scatter)
-        self.add_widget(scatter)
+                scatter.add_widget(ellipse_image)
+                self.collision_ellipses.append(scatter)
+                self.add_widget(scatter)
 
-        offset_x = self.width * 0.01
-        offset_y = self.height * 0.04
+                offset_x = self.width * 0.09
+                offset_y = self.height * 0.065
 
-        scatter.pos = (position[0] - offset_x, position[1] - offset_y)
+                scatter.pos = (position[0] - offset_x, position[1] - offset_y)
 
-        Clock.schedule_once(lambda dt: self.remove_collision_ellipse(scatter), 0.5)
+                Clock.schedule_once(lambda dt: self.remove_collision_ellipse(scatter), 0.5)
+            else:
+                pass
 
 
     def remove_collision_ellipse(self, ellipse):
@@ -418,7 +466,47 @@ class MainWidget(RelativeLayout):
         self.collision_ellipses.remove(ellipse)
 
         
+    def spawn_collision_comic(self, position, image_file=None):
+        if self.vfx_option:
+            if image_file is None:
+                image_temp = "images/pow.png"
+            else:
+                image_temp = image_file
+            opacity = 0.6
+            comic_image = Image(source=image_temp, opacity=0.6)
+            comic_image.size_hint = (None, None)
+            comic_image.size = (self.collision_comic_size * self.height, self.collision_comic_size * self.height)
 
+            scatter = Scatter(
+                size_hint=(None, None),
+                size=comic_image.size,
+                do_translation=False
+            )
+
+            scatter.add_widget(comic_image)
+            self.collision_comic.append(scatter)
+            self.add_widget(scatter)
+
+            offset_side = 0
+            if position[0] > self.width/2:
+                offset_side = 1
+            else:
+                offset_side = -2
+
+            offset_x = self.width * 0.09 * offset_side
+            offset_y = self.height * 0.04
+
+            scatter.pos = (position[0] - offset_x, position[1] + offset_y)
+
+
+            Clock.schedule_once(lambda dt: self.remove_collision_comic(scatter), 0.6)
+        else:
+            pass
+
+
+    def remove_collision_comic(self, comic):
+        self.remove_widget(comic)
+        self.collision_comic.remove(comic)
 
 
 class PlatformApp(App):
